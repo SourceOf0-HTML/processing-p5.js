@@ -75,14 +75,15 @@ keyRect=(note,x,y,w,h)=>(T=collisionRect(x,y,w,h),T.note=note,T);
 collisionRect=(x,y,w,h)=>({
   x,y,
   w,h,
-  isHit:function(){
-    return mouseIsPressed && collision(this);
+  isHit:function() {
+    return mouseIsPressed && this.collision();
   },
-  show:function(isPush){
+  show:function(isPush) {
     fill( isPush ? 220 : 255 );
     rect(this.x, this.y, this.w, this.h);
     return isPush;
   },
+  collision:function() {
+    return mouseX > this.x && mouseX < this.x+this.w && mouseY > this.y && mouseY < this.y+this.h;
+  },
 });
-
-collision=T=>(mouseX > T.x && mouseX < T.x+T.w && mouseY > T.y && mouseY < T.y+T.h )?true:false;
