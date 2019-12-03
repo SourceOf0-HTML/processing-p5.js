@@ -9,10 +9,11 @@ function setup() {
 }
 
 function draw() {
+  p = pixelDensity();
   sh.setUniform("smp", g);
   sh.setUniform("time", millis() / 10000.0);
-  sh.setUniform("mouse", [mouseX, mouseY]);
-  sh.setUniform("resolution", [width, height]);
+  sh.setUniform("mouse", [mouseX*p, mouseY*p]);
+  sh.setUniform("resolution", [width*p, height*p]);
   
   g.shader(sh);
   g.rect(0, 0, width, height);
