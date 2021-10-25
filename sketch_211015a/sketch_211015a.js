@@ -2,7 +2,7 @@
 function debugLog(str) {
   console.log(str);
 }
-  
+
 let GameData = {
   STATE: {
     INTRO: "INTRO",
@@ -47,6 +47,7 @@ let GameData = {
     this.stoneWhiteColor = color(250);
     
     this.playerScore = 0;
+    this.comScore = 0;
     this.upsetStonesPos = [];
     
     this.currentState = this.STATE.INTRO;
@@ -56,6 +57,17 @@ let GameData = {
     this.comColor = this.STONE_STATE.NONE;
     this.setSize();
     
+    this.stateList = {};
+    this.stateList[this.STATE.INTRO] = new IntroState();
+    this.stateList[this.STATE.TURN_PLAYER] = new TurnPlayerState();
+    this.stateList[this.STATE.SET_PLAYER] = new SetPlayerState();
+    this.stateList[this.STATE.SKIP_PLAYER] = new SkipPlayerState();
+    this.stateList[this.STATE.TURN_COM] = new TurnComState();
+    this.stateList[this.STATE.SET_COM] = new SetComState();
+    this.stateList[this.STATE.SKIP_COM] = new SkipComState();
+    this.stateList[this.STATE.SCORE] = new ScoreState();
+    this.stateList[this.STATE.END] = new EndState();
+    
     for(let y = 0; y < this.cellNum; ++y) {
       this.stoneStates[y] = [];
       for(let x = 0; x < this.cellNum; ++x) {
@@ -63,10 +75,10 @@ let GameData = {
       }
     }
     let halfNum = this.cellNum/2;
-    this.stoneStates[floor(halfNum-1)][floor(halfNum-1)] = GameData.STONE_STATE.BLACK;
-    this.stoneStates[floor(halfNum  )][floor(halfNum  )] = GameData.STONE_STATE.BLACK;
-    this.stoneStates[floor(halfNum-1)][floor(halfNum  )] = GameData.STONE_STATE.WHITE;
-    this.stoneStates[floor(halfNum  )][floor(halfNum-1)] = GameData.STONE_STATE.WHITE;
+    this.stoneStates[floor(halfNum-1)][floor(halfNum-1)] = this.STONE_STATE.BLACK;
+    this.stoneStates[floor(halfNum  )][floor(halfNum  )] = this.STONE_STATE.BLACK;
+    this.stoneStates[floor(halfNum-1)][floor(halfNum  )] = this.STONE_STATE.WHITE;
+    this.stoneStates[floor(halfNum  )][floor(halfNum-1)] = this.STONE_STATE.WHITE;
   },
   
   debugPrintBoard: function() {
@@ -151,6 +163,7 @@ let GameData = {
   
   checkGameState: function() {
     this.playerScore = 0;
+    this.comScore = 0;
     
     let isGameset = true;
     for(let y = 0; y < this.cellNum; ++y) {
@@ -158,12 +171,14 @@ let GameData = {
         if(isGameset && (this.stoneStates[y][x] == this.STONE_STATE.NONE)) {
           isGameset = false;
         }
-        if(this.stoneStates[y][x] == this.STONE_STATE.BLACK) {
+        if(this.stoneStates[y][x] == this.playerColor) {
           ++this.playerScore;
+        } else {
+          ++this.comScore;
         }
       }
     }
-    if(isGameset) {
+    if(isGameset || this.playerScore == 0 || this.comScore == 0) {
       this.nextState = this.STATE.SCORE;
     } else if(this.currentState == this.STATE.SET_PLAYER) {
       if(this.canSetStone(this.comColor)) {
@@ -218,105 +233,15 @@ let GameData = {
   },
   
   onClick: function() {
-    switch(this.currentState) {
-      case this.STATE.INTRO:
-        if(mouseButton === LEFT) {
-          this.playerColor = this.STONE_STATE.BLACK;
-          this.comColor = this.STONE_STATE.WHITE;
-          this.nextState = this.STATE.TURN_PLAYER;
-        } else if(mouseButton === CENTER) {
-          this.playerColor = this.STONE_STATE.WHITE;
-          this.comColor = this.STONE_STATE.BLACK;
-          this.nextState = this.STATE.TURN_COM;
-        }
-        break;
-      case this.STATE.TURN_PLAYER:
-        this.setPlayerStone();
-        break;
-      case this.STATE.SET_PLAYER:
-        break;
-      case this.STATE.SKIP_PLAYER:
-        this.nextState = this.STATE.TURN_COM;
-        break;
-      case this.STATE.TURN_COM:
-        break;
-      case this.STATE.SET_COM:
-        break;
-      case this.STATE.SKIP_COM:
-        this.nextState = this.STATE.TURN_PLAYER;
-        break;
-      case this.STATE.SCORE:
-        this.nextState = this.STATE.END;
-        break;
-      case this.STATE.END:
-        break;
-    }
-  },
-  
-  transition: function() {
-    debugLog(this.currentState + " -> " + this.nextState);
-    switch(this.currentState) {
-      case this.STATE.INTRO:
-        this.currentState = this.nextState;
-        break;
-      case this.STATE.TURN_PLAYER:
-        this.currentState = this.nextState;
-        break;
-      case this.STATE.SET_PLAYER:
-        this.currentState = this.nextState;
-        break;
-      case this.STATE.SKIP_PLAYER:
-        this.currentState = this.nextState;
-        break;
-      case this.STATE.TURN_COM:
-        this.currentState = this.nextState;
-        break;
-      case this.STATE.SET_COM:
-        this.currentState = this.nextState;
-        break;
-      case this.STATE.SKIP_COM:
-        this.currentState = this.nextState;
-        break;
-      case this.STATE.SCORE:
-        this.currentState = this.nextState;
-        break;
-      case this.STATE.END:
-        this.currentState = this.nextState;
-        break;
-    }
+    this.stateList[this.currentState].onClick();
   },
   
   update: function() {
     if(this.nextState == this.currentState) {
-      switch(this.currentState) {
-        case this.STATE.INTRO:
-          break;
-        case this.STATE.TURN_PLAYER:
-          break;
-        case this.STATE.SET_PLAYER:
-          this.upsetStonesPos.forEach(pos=>{ this.stoneStates[pos.y][pos.x] = this.playerColor; });
-          this.upsetStonesPos = [];
-          this.checkGameState();
-          break;
-        case this.STATE.SKIP_PLAYER:
-          break;
-        case this.STATE.TURN_COM:
-          this.setComStone();
-          break;
-        case this.STATE.SET_COM:
-          this.upsetStonesPos.forEach(pos=>{ this.stoneStates[pos.y][pos.x] = this.comColor; });
-          this.upsetStonesPos = [];
-          this.checkGameState();
-          break;
-        case this.STATE.SKIP_COM:
-          break;
-        case this.STATE.SCORE:
-          break;
-        case this.STATE.END:
-          break;
-      }
+      this.stateList[this.currentState].update();
     } else {
-      this.transition();
+      debugLog(this.currentState + " -> " + this.nextState);
+      this.stateList[this.currentState].transition();
     }
   },
   
@@ -351,53 +276,118 @@ let GameData = {
   
   draw: function() {
     GameData.drawBoard();
-    
-    switch(this.currentState) {
-      case this.STATE.INTRO:
-        textSize(this.cellSize);
-        textAlign(CENTER);
-        fill(255);
-        text("左クリック：先手\n右クリック：後手", windowWidth/2, windowHeight/2);
-        break;
-      case this.STATE.TURN_PLAYER:
-        break;
-      case this.STATE.SET_PLAYER:
-        break;
-      case this.STATE.SKIP_PLAYER:
-        textSize(this.cellSize);
-        textAlign(CENTER);
-        fill(255);
-        text("プレイヤースキップ", windowWidth/2, windowHeight/2);
-        break;
-      case this.STATE.TURN_COM:
-        break;
-      case this.STATE.SET_COM:
-        break;
-      case this.STATE.SKIP_COM:
-        textSize(this.cellSize);
-        textAlign(CENTER);
-        fill(255);
-        text("COMスキップ", windowWidth/2, windowHeight/2);
-        break;
-      case this.STATE.SCORE:
-        textSize(this.cellSize);
-        textAlign(CENTER);
-        fill(255);
-        text("スコア：" + this.playerScore, windowWidth/2, windowHeight/2);
-        if(this.playerScore == (this.cellNum * this.cellNum) / 2) {
-          text("引き分け", windowWidth/2, windowHeight/2 + this.cellSize);
-        } else if(this.playerScore > (this.cellNum * this.cellNum) / 2) {
-          text("勝ち", windowWidth/2, windowHeight/2 + this.cellSize);
-        } else {
-          text("負け", windowWidth/2, windowHeight/2 + this.cellSize);
-        }
-        break;
-      case this.STATE.END:
-        this.init();
-        break;
-    }
+    this.stateList[this.currentState].draw();
   },
 };
+
+
+class BaseState {
+  constructor() {}
+  onClick() {}
+  transition() {
+    GameData.currentState = GameData.nextState;
+  }
+  update() {}
+  draw() {}
+}
+
+class IntroState extends BaseState {
+  onClick() {
+    if(mouseButton === LEFT) {
+      GameData.playerColor = GameData.STONE_STATE.BLACK;
+      GameData.comColor = GameData.STONE_STATE.WHITE;
+      GameData.nextState = GameData.STATE.TURN_PLAYER;
+    } else if(mouseButton === CENTER) {
+      GameData.playerColor = GameData.STONE_STATE.WHITE;
+      GameData.comColor = GameData.STONE_STATE.BLACK;
+      GameData.nextState = GameData.STATE.TURN_COM;
+    }
+  }
+  draw() {
+    textSize(GameData.cellSize);
+    textAlign(CENTER);
+    fill(255);
+    text("左クリック：先手\n右クリック：後手", windowWidth/2, windowHeight/2);
+  }
+}
+
+class TurnPlayerState extends BaseState {
+  onClick() {
+    GameData.setPlayerStone();
+  }
+}
+
+class SetPlayerState extends BaseState {
+  update() {
+    GameData.upsetStonesPos.forEach(pos=>{ GameData.stoneStates[pos.y][pos.x] = GameData.playerColor; });
+    GameData.upsetStonesPos = [];
+    GameData.checkGameState();
+  }
+}
+
+class SkipPlayerState extends BaseState {
+  onClick() {
+    GameData.nextState = GameData.STATE.TURN_COM;
+  }
+  draw() {
+    textSize(GameData.cellSize);
+    textAlign(CENTER);
+    fill(255);
+    text("プレイヤースキップ", windowWidth/2, windowHeight/2);
+  }
+}
+
+class TurnComState extends BaseState {
+  update() {
+    GameData.setComStone();
+  }
+}
+
+class SetComState extends BaseState {
+  update() {
+    GameData.upsetStonesPos.forEach(pos=>{ GameData.stoneStates[pos.y][pos.x] = GameData.comColor; });
+    GameData.upsetStonesPos = [];
+    GameData.checkGameState();
+  }
+}
+
+class SkipComState extends BaseState {
+  onClick() {
+    GameData.nextState = GameData.STATE.TURN_PLAYER;
+  }
+  draw() {
+    textSize(GameData.cellSize);
+    textAlign(CENTER);
+    fill(255);
+    text("COMスキップ", windowWidth/2, windowHeight/2);
+  }
+}
+
+class ScoreState extends BaseState {
+  onClick() {
+    GameData.nextState = GameData.STATE.END;
+  }
+  draw() {
+    textSize(GameData.cellSize);
+    textAlign(CENTER);
+    fill(255);
+    text("スコア：" + GameData.playerScore, windowWidth/2, windowHeight/2);
+    if(GameData.playerScore == (GameData.cellNum * GameData.cellNum) / 2) {
+      text("引き分け", windowWidth/2, windowHeight/2 + GameData.cellSize);
+    } else if(GameData.playerScore > (GameData.cellNum * GameData.cellNum) / 2) {
+      text("勝ち", windowWidth/2, windowHeight/2 + GameData.cellSize);
+    } else {
+      text("負け", windowWidth/2, windowHeight/2 + GameData.cellSize);
+    }
+  }
+}
+
+class EndState extends BaseState {
+  update() {
+    GameData.init();
+  }
+}
+
 
 function setup() {
   frameRate(30);
