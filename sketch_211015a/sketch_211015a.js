@@ -1,6 +1,79 @@
+window.WebFontConfig = {
+  google: { families: ["Kosugi Maru"] },
+  active: function() {
+    sessionStorage.fonts = true;
+  }
+};
+(function() {
+  let wf = document.createElement("script");
+  wf.src = "https://ajax.googleapis.com/ajax/libs/webfont/1.6.26/webfont.js";
+  wf.type = "text/javascript";
+  wf.async = "true";
+  let s = document.getElementsByTagName("script")[0];
+  s.parentNode.insertBefore(wf, s);
+})();
+
 
 function debugLog(str) {
-  console.log(str);
+  //console.log(str);
+}
+
+class Text {
+  constructor(str, x, y) {
+    this.str = str;
+    this.setSize(x, y);
+  }
+  setSize(x, y) {
+    this.x = x;
+    this.y = y;
+    this.size = GameData.boardSize*0.1;
+    this.lineSize = GameData.boardSize*0.02;
+  }
+  draw() {
+    fill(255);
+    stroke(0, 60, 40);
+    textAlign(CENTER);
+    textSize(this.size);
+    strokeWeight(this.lineSize);
+    text(this.str, this.x, this.y);
+  }
+}
+
+class TextButton extends Text {
+  constructor(str, x, y) {
+    super(str, x, y);
+    this.setSize(x, y);
+  }
+  setSize(x, y) {
+    super.setSize(x, y);
+    textSize(this.size);
+    
+    let w = textWidth(this.str);
+    this.bgX = this.x - (w + this.size)/2;
+    this.bgY = this.y - this.size * 1.2;
+    this.bgW = w + this.size;
+    this.bgH = this.size * 1.7;
+  }
+  isHit() {
+    return mouseX > this.bgX && mouseX < this.bgX+this.bgW && mouseY > this.bgY && mouseY < this.bgY+this.bgH;
+  }
+  draw() {
+    if(this.isHit()) {
+      fill(150, 250, 200);
+      stroke(70, 170, 120);
+    } else {
+      fill(70, 170, 120);
+      stroke(0, 60, 40);
+    }
+    strokeWeight(this.lineSize);
+    rect(this.bgX, this.bgY, this.bgW, this.bgH, this.size);
+    textAlign(CENTER);
+    fill(255);
+    stroke(0, 60, 40);
+    strokeWeight(this.lineSize);
+    textSize(this.size);
+    text(this.str, this.x, this.y);
+  }
 }
 
 let GameData = {
@@ -38,13 +111,29 @@ let GameData = {
     this.cellWeight = this.cellSize * 0.1;
     this.boardX = (windowWidth - this.boardSize) / 2;
     this.boardY = (windowHeight - this.boardSize) / 2;
+    
+    Object.keys(this.stateList).forEach(k=> {
+      this.stateList[k].setSize();
+    });
   },
   
   init: function() {
+    this.noise = new p5.Noise();
+    this.noise.amp(0);
+    this.noise.start();
+    this.env = new p5.Env();
+    this.env.setADSR(0.00025, 0.025, 0.05, 0.025);
+    this.env.setRange(0.2, 0);
+  
+    noSmooth();
     this.cellColor = color(0, 150, 100);
+    this.foucsCellColor = color(180, 180, 0);
     this.cellLineColor = color(0, 60, 40);
+    this.foucsCellLineColor = color(80, 80, 0);
     this.stoneBlackColor = color(20);
     this.stoneWhiteColor = color(250);
+    
+    this.focusCell = {x:-1, y:-1};
     
     this.playerScore = 0;
     this.comScore = 0;
@@ -55,7 +144,6 @@ let GameData = {
     
     this.playerColor = this.STONE_STATE.NONE;
     this.comColor = this.STONE_STATE.NONE;
-    this.setSize();
     
     this.stateList = {};
     this.stateList[this.STATE.INTRO] = new IntroState();
@@ -67,6 +155,7 @@ let GameData = {
     this.stateList[this.STATE.SKIP_COM] = new SkipComState();
     this.stateList[this.STATE.SCORE] = new ScoreState();
     this.stateList[this.STATE.END] = new EndState();
+    this.setSize();
     
     for(let y = 0; y < this.cellNum; ++y) {
       this.stoneStates[y] = [];
@@ -198,15 +287,18 @@ let GameData = {
   setPlayerStone: function() {
     let x = floor((mouseX - this.boardX) / this.cellSize);
     let y = floor((mouseY - this.boardY) / this.cellSize);
+    this.focusCell.x = x;
+    this.focusCell.y = y;
     if(x >= 0 && x < this.cellNum && y >= 0 && y < this.cellNum) {
       let upsetStonePos = this.checkSetStone(x, y, this.playerColor);
       if(upsetStonePos.length > 0) {
         this.upsetStonesPos = upsetStonePos;
         this.stoneStates[y][x] = this.playerColor;
         this.nextState = this.STATE.SET_PLAYER;
-        return;
+        return true;
       }
     }
+    return false;
   },
   
   setComStone: function() {
@@ -226,6 +318,8 @@ let GameData = {
       }
     }
     if(maxStoneNum > 0) {
+      this.focusCell.x = setX;
+      this.focusCell.y = setY;
       this.stoneStates[setY][setX] = this.comColor;
       this.upsetStonesPos = upsetStonesPos;
     }
@@ -251,14 +345,21 @@ let GameData = {
     let cellSize = this.cellSize;
     let cellNum = this.cellNum;
     
-    stroke(this.cellLineColor);
     strokeWeight(this.cellWeight);
     for(let y = 0; y < cellNum; ++y) {
       for(let x = 0; x < cellNum; ++x) {
         let cellX = boardX + cellSize*x;
         let cellY = boardY + cellSize*y;
-        fill(this.cellColor);
-        rect(cellX, cellY, cellSize, cellSize);
+        if(x == this.focusCell.x && y == this.focusCell.y) {
+          stroke(this.cellLineColor);
+          fill(this.foucsCellColor);
+          rect(cellX, cellY, cellSize, cellSize);
+          stroke(this.foucsCellLineColor);
+        } else {
+          stroke(this.cellLineColor);
+          fill(this.cellColor);
+          rect(cellX, cellY, cellSize, cellSize);
+        }
         switch(this.stoneStates[y][x]) {
           case this.STONE_STATE.BLACK:
             fill(this.stoneBlackColor);
@@ -281,104 +382,195 @@ let GameData = {
 };
 
 
+// States
+
 class BaseState {
   constructor() {}
   onClick() {}
   transition() {
     GameData.currentState = GameData.nextState;
   }
+  setSize() {}
   update() {}
   draw() {}
 }
 
 class IntroState extends BaseState {
+  constructor() {
+    super();
+    this.selectText = new Text("選んでください");
+    this.selectBlackText = new TextButton("先攻");
+    this.selectWhiteText = new TextButton("後攻");
+  }
+  setSize() {
+    this.selectText.setSize(windowWidth/2, windowHeight*0.1);
+    this.selectBlackText.setSize(windowWidth/2 - GameData.cellSize*2, windowHeight*0.19);
+    this.selectWhiteText.setSize(windowWidth/2 + GameData.cellSize*2, windowHeight*0.19);
+  }
   onClick() {
-    if(mouseButton === LEFT) {
+    userStartAudio();
+    if(this.selectBlackText.isHit()) {
       GameData.playerColor = GameData.STONE_STATE.BLACK;
       GameData.comColor = GameData.STONE_STATE.WHITE;
       GameData.nextState = GameData.STATE.TURN_PLAYER;
-    } else if(mouseButton === CENTER) {
+    } else if(this.selectWhiteText.isHit()) {
       GameData.playerColor = GameData.STONE_STATE.WHITE;
       GameData.comColor = GameData.STONE_STATE.BLACK;
       GameData.nextState = GameData.STATE.TURN_COM;
     }
   }
   draw() {
-    textSize(GameData.cellSize);
-    textAlign(CENTER);
-    fill(255);
-    text("左クリック：先手\n右クリック：後手", windowWidth/2, windowHeight/2);
+    this.selectText.draw();
+    this.selectBlackText.draw();
+    this.selectWhiteText.draw();
   }
 }
 
 class TurnPlayerState extends BaseState {
+  constructor() {
+    super();
+    this.telopCount = 0;
+    this.animeCount = -5;
+    this.text = new Text("プレイヤーのターン");
+    this.warnText = new Text("そこには置けません");
+  }
+  setSize() {
+    this.text.setSize(windowWidth/2, GameData.boardY - GameData.cellSize);
+    this.warnText.setSize(windowWidth/2, windowHeight*0.52);
+  }
+  transition() {
+    if(GameData.upsetStonesPos.length == 0) {
+      this.animeCount = -5;
+      GameData.currentState = GameData.nextState;
+      return;
+    }
+    if(this.animeCount == 5) {
+      let pos = GameData.upsetStonesPos.shift();
+      GameData.stoneStates[pos.y][pos.x] = GameData.playerColor;
+      this.animeCount = 0;
+    }
+    ++this.animeCount;
+  }
   onClick() {
-    GameData.setPlayerStone();
+    if(GameData.currentState == GameData.nextState && !GameData.setPlayerStone()) {
+      this.telopCount = 30;
+    } else {
+      GameData.env.play(GameData.noise);
+      this.telopCount = 0;
+    }
+  }
+  draw() {
+    this.text.draw();
+    if(this.telopCount > 0) {
+      this.warnText.draw();
+      --this.telopCount;
+    }
   }
 }
 
 class SetPlayerState extends BaseState {
   update() {
-    GameData.upsetStonesPos.forEach(pos=>{ GameData.stoneStates[pos.y][pos.x] = GameData.playerColor; });
-    GameData.upsetStonesPos = [];
     GameData.checkGameState();
   }
 }
 
 class SkipPlayerState extends BaseState {
+  constructor() {
+    super();
+    this.text = new Text("プレイヤースキップ");
+  }
+  setSize() {
+    this.text.setSize(windowWidth/2, windowHeight/2);
+  }
   onClick() {
     GameData.nextState = GameData.STATE.TURN_COM;
   }
   draw() {
-    textSize(GameData.cellSize);
-    textAlign(CENTER);
-    fill(255);
-    text("プレイヤースキップ", windowWidth/2, windowHeight/2);
+    this.text.draw();
   }
 }
 
 class TurnComState extends BaseState {
+  constructor() {
+    super();
+    this.animeCount = 0;
+    this.text = new Text("COMのターン");
+  }
+  setSize() {
+    this.text.setSize(windowWidth/2, GameData.boardY - GameData.cellSize);
+  }
+  transition() {
+    if(GameData.upsetStonesPos.length == 0) {
+      this.animeCount = 0;
+      GameData.currentState = GameData.nextState;
+      return;
+    }
+    if(this.animeCount == 5) {
+      let pos = GameData.upsetStonesPos.shift();
+      GameData.stoneStates[pos.y][pos.x] = GameData.comColor;
+      this.animeCount = 0;
+    }
+    ++this.animeCount;
+  }
   update() {
-    GameData.setComStone();
+    ++this.animeCount;
+    if(this.animeCount == 15) {
+      GameData.setComStone();
+      GameData.env.play(GameData.noise);
+      this.animeCount = -5;
+    }
+  }
+  draw() {
+    this.text.draw();
   }
 }
 
 class SetComState extends BaseState {
   update() {
-    GameData.upsetStonesPos.forEach(pos=>{ GameData.stoneStates[pos.y][pos.x] = GameData.comColor; });
-    GameData.upsetStonesPos = [];
     GameData.checkGameState();
   }
 }
 
 class SkipComState extends BaseState {
+  constructor() {
+    super();
+    this.text = new Text("COMスキップ");
+  }
+  setSize() {
+    this.text.setSize(windowWidth/2, windowHeight/2);
+  }
   onClick() {
     GameData.nextState = GameData.STATE.TURN_PLAYER;
   }
   draw() {
-    textSize(GameData.cellSize);
-    textAlign(CENTER);
-    fill(255);
-    text("COMスキップ", windowWidth/2, windowHeight/2);
+    this.text.draw();
   }
 }
 
 class ScoreState extends BaseState {
+  constructor() {
+    super();
+    this.scoreText = new Text("");
+    this.text = new Text("");
+  }
+  setSize() {
+    this.scoreText.setSize(windowWidth/2, windowHeight/2);
+    this.text.setSize(windowWidth/2, windowHeight/2 + GameData.cellSize);
+  }
   onClick() {
     GameData.nextState = GameData.STATE.END;
   }
   draw() {
-    textSize(GameData.cellSize);
-    textAlign(CENTER);
-    fill(255);
-    text("スコア：" + GameData.playerScore, windowWidth/2, windowHeight/2);
+    this.scoreText.str = "スコア：" + GameData.playerScore;
+    this.scoreText.draw();
     if(GameData.playerScore == (GameData.cellNum * GameData.cellNum) / 2) {
-      text("引き分け", windowWidth/2, windowHeight/2 + GameData.cellSize);
+      this.text.str = "引き分け";
     } else if(GameData.playerScore > (GameData.cellNum * GameData.cellNum) / 2) {
-      text("勝ち", windowWidth/2, windowHeight/2 + GameData.cellSize);
+      this.text.str = "勝ち";
     } else {
-      text("負け", windowWidth/2, windowHeight/2 + GameData.cellSize);
+      this.text.str = "負け";
     }
+    this.text.draw();
   }
 }
 
@@ -388,12 +580,16 @@ class EndState extends BaseState {
   }
 }
 
+// p5.js func
 
 function setup() {
   frameRate(30);
+  getAudioContext().suspend();
+  
   GameData.init();
   createCanvas(windowWidth, windowHeight);
   background(50, 80, 70);
+  textFont("Kosugi Maru");
 }
 
 function draw() {
