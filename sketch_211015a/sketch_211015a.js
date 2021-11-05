@@ -588,12 +588,12 @@ function setup() {
   
   GameData.init();
   createCanvas(windowWidth, windowHeight);
-  background(50, 80, 70);
   textFont("Kosugi Maru");
 }
 
 function draw() {
   clear();
+  background(70, 80, 80);
   GameData.update();
   GameData.draw();
 }
