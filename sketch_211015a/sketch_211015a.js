@@ -376,7 +376,9 @@ let GameData = {
   },
   
   draw: function() {
-    GameData.drawBoard();
+    if(this.currentState != this.STATE.INTRO) {
+      GameData.drawBoard();
+    }
     this.stateList[this.currentState].draw();
   },
 };
@@ -403,9 +405,9 @@ class IntroState extends BaseState {
     this.selectWhiteText = new TextButton("後攻");
   }
   setSize() {
-    this.selectText.setSize(windowWidth/2, windowHeight*0.1);
-    this.selectBlackText.setSize(windowWidth/2 - GameData.cellSize*2, windowHeight*0.19);
-    this.selectWhiteText.setSize(windowWidth/2 + GameData.cellSize*2, windowHeight*0.19);
+    this.selectText.setSize(windowWidth/2, windowHeight*0.45);
+    this.selectBlackText.setSize(windowWidth/2 - GameData.cellSize*2, windowHeight*0.55);
+    this.selectWhiteText.setSize(windowWidth/2 + GameData.cellSize*2, windowHeight*0.55);
   }
   onClick() {
     userStartAudio();
